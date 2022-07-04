@@ -66,17 +66,23 @@ int main(int argc, char *argv[])
      Note that a filter is added so that we only get events for
      "hidraw" devices. */
 
-    /* Set up a monitor to monitor hidraw devices */
+    // 创建一个新的 monitor，函数的第二个参数是事件源的名称，可选"kernel"或"udev"。
+    // 基于"kernel"的事件通知要早于"udev"，但相关的设备结点未必创建完成，
+    // 所以一般应用的设计要基于"udev"进行监控。
     mon = udev_monitor_new_from_netlink(udev, "udev");
+    // 增加一个基于设备类型的 udev 事件过滤器，例如: "block" 设备。
     udev_monitor_filter_add_match_subsystem_devtype(mon, argv[1], NULL);
+    // 启动监控过程.
     udev_monitor_enable_receiving(mon);
     /* Get the file descriptor (fd) for the monitor.
      This fd will get passed to select() */
     fd = udev_monitor_get_fd(mon);
 
-    /* Create a list of the devices in the 'hidraw' subsystem. */
+    // 创建一个枚举器，用于扫描系统已接设备。
     enumerate = udev_enumerate_new(udev);
+    // 增加枚举的过滤器，过滤关键字以字符表示，如"block"设备。
     udev_enumerate_add_match_subsystem(enumerate, argv[1]);
+    // 扫描 /sys 目录下，所有与过滤器匹配的设备。
     udev_enumerate_scan_devices(enumerate);
     devices = udev_enumerate_get_list_entry(enumerate);
     /* 
@@ -89,10 +95,7 @@ int main(int argc, char *argv[])
     udev_list_entry_foreach(dev_list_entry, devices)
     {
         const char *path;
-        /* 
-            Get the filename of the /sys entry for the device
-            and create a udev_device object (dev) representing it 
-        */
+        // 得到一个设备结点的 sys 路径.
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
         /* 
@@ -174,15 +177,14 @@ int main(int argc, char *argv[])
         if (ret > 0 && FD_ISSET(fd, &fds)) {
             printf("\nselect() says there should be data\n");
 
-            /* Make the call to receive the device.
-             select() ensured that this will not block. */
+            // 获取产生事件的设备映射。
             dev = udev_monitor_receive_device(mon);
             if (dev) {
                 printf("Got Device\n");
                 printf(" Node: %s\n", udev_device_get_devnode(dev));
                 printf(" Subsystem: %s\n", udev_device_get_subsystem(dev));
                 printf(" Devtype: %s\n", udev_device_get_devtype(dev));
-
+                //获得一个字符串："add"或者"remove"，以及"change", "online", "offline"等
                 printf(" Action: %s\n", udev_device_get_action(dev));
                 udev_device_unref(dev);
             } else {
