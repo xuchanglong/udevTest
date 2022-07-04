@@ -4,8 +4,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-int main(void)
+// hidraw
+// block
+int main(int argc, char *argv[])
 {
+    if (argc == 1)
+        return 0;
     struct udev *udev;
     struct udev_enumerate *enumerate;
     struct udev_list_entry *devices, *dev_list_entry;
@@ -18,7 +22,7 @@ int main(void)
     }
     /* Create a list of the devices in the 'hidraw' subsystem. */
     enumerate = udev_enumerate_new(udev);
-    udev_enumerate_add_match_subsystem(enumerate, "hidraw");
+    udev_enumerate_add_match_subsystem(enumerate, argv[1]);
     udev_enumerate_scan_devices(enumerate);
     devices = udev_enumerate_get_list_entry(enumerate);
     /* 
@@ -52,7 +56,7 @@ int main(void)
         */
         dev = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
         if (!dev) {
-            printf("Unable to find parent usb device.");
+            printf("Unable to find parent usb device.\n");
             exit(1);
         }
         /* 
