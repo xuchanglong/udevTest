@@ -23,11 +23,15 @@
               moved to before enumeration.
 *******************************************/
 
+// https://blog.51cto.com/u_3078781/3288064
+
 #include <libudev.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <unistd.h>
+
+void test_print_devnode_properties(void);
 
 // hidraw
 // block
@@ -35,6 +39,10 @@ int main(int argc, char *argv[])
 {
     if (argc == 1)
         return 0;
+    if (strcmp(argv[1], "test") == 0) {
+        test_print_devnode_properties();
+        return 0;
+    }
     struct udev *udev;
     struct udev_enumerate *enumerate;
     struct udev_list_entry *devices, *dev_list_entry;
@@ -198,4 +206,78 @@ int main(int argc, char *argv[])
 
     udev_unref(udev);
     return 0;
+}
+
+/**
+ * 打印/dev/xxx设备节点的properties值
+ * @devnode: 设备节点文件/dev/xxx,如:/dev/ttyUSB0
+ */
+int print_devnode_properties(const char *devnode)
+{
+    int ret = 0;
+    struct udev *udev;
+    struct udev_device *device;
+    struct udev_enumerate *enumerate;
+    struct udev_list_entry *first_entry;
+    struct udev_list_entry *list_entry;
+    const char *syspath;
+
+    udev = udev_new();
+    enumerate = udev_enumerate_new(udev);
+
+    /*
+	 * 通过枚举器添加匹配条件,如果有多条匹配条件
+	 */
+    udev_enumerate_add_match_property(enumerate, "DEVNAME", devnode);
+
+    /*
+	 * 根据枚举器设置的条件扫描所有的设备.
+	 * 注意: 如果有多条匹配条件,符合其中一条就会被扫描到,
+	 *       匹配条件越多,扫描越宽松
+	 */
+    udev_enumerate_scan_devices(enumerate);
+
+    list_entry = udev_enumerate_get_list_entry(enumerate);
+
+    if (!list_entry) {
+        ret = -1;
+        goto ERROR1;
+    }
+
+    syspath = udev_list_entry_get_name(list_entry);
+    device = udev_device_new_from_syspath(udev, syspath);
+
+    if (!device) {
+        ret = -1;
+        goto ERROR1;
+    }
+
+    first_entry = udev_device_get_properties_list_entry(device);
+
+    if (!first_entry) {
+        ret = -1;
+        goto ERROR2;
+    }
+
+    udev_list_entry_foreach(list_entry, first_entry)
+    {
+        printf("%s = %s\n", udev_list_entry_get_name(list_entry), udev_list_entry_get_value(list_entry));
+    }
+
+ERROR2:
+    udev_device_unref(device);
+ERROR1:
+    udev_enumerate_unref(enumerate);
+    udev_unref(udev);
+    return ret;
+}
+
+void test_print_devnode_properties(void)
+{
+    print_devnode_properties("/dev/ttyUSB0");
+    print_devnode_properties("/dev/sda1");
+    /*
+	 * 异常情况测试
+	 */
+    print_devnode_properties("/dev/");
 }
